@@ -1,0 +1,27 @@
+---
+description: src/pages directory File Organization
+globs: src/pages/**
+alwaysApply: true
+---
+
+/src
+  /pages
+    /[pagename]
+      /index.tsx              # all pages should have own folder and index.tsx. wrong: /src/pages/somepath/bad_page.tsx. right: /src/pages/somepath/good_page/index.tsx. this component only get params and check. then it calls containers
+      /_components
+        /ui/                   # dumb components. only allow react, @/components imports. use shadcn
+        /hooks/                # non ui logics. not allow _ui, @/components imports
+        /container/            # smart components ( but no UI code . connect ui and logic. only allow _ui, _hooks. disallow html
+/components                    # preffer dumb components. 
+  /ui                          # shadcn components. only edit styles
+  /[other components]
+/hooks
+  /db
+    /[table-name]
+      /mutations               # logics that changes db. use tanstach-router
+      /queries                 # logics that does not change db. use tanstach-router
+/libs
+  /consts          #
+
+
+

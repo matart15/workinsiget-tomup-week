@@ -1,0 +1,48 @@
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+
+import { getAuthUser, getAuthUserId } from "../../_shared/supabaseClient.ts";
+import { getSupabaseAdmin } from "../../_shared/supabaseAdmin.ts";
+import { CustomError } from "../../_shared/errorResponse.ts";
+import { dataResponse } from "../../_shared/dataResponse.ts";
+
+const FUNCTION_NAME = "{{ functionName }}";
+
+export const _internals = {
+  getAuthUserId,
+  getAuthUser,
+  getSupabaseAdmin,
+};
+
+export const {{ functionName }} = async ({ req, args }: { args: any; req: Request }) => {
+  console.log(`${FUNCTION_NAME} called`, args);
+  console.log("args are", args)
+  // 1. get current user id
+  // const currentUserId = await _internals.getAuthUserId(req);
+  const supabaseAdmin = _internals.getSupabaseAdmin();
+  const currentUser = await _internals.getAuthUser(req);
+
+  const deleteUserResult = await someLogicFunction(
+    currentUser.id,
+  );
+  if (deleteUserResult.error) {
+    throw new CustomError("NEW_ERROR_TYPE", {
+      extra: deleteUserResult.error,
+    });
+  }
+
+  return dataResponse({
+    status: "ok",
+  });
+};
+
+/* To invoke locally:
+
+  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
+  2. Make an HTTP request:
+
+  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/{{ functionName }}' \
+    --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
+    --header 'Content-Type: application/json' \
+    --data '{"name":"Functions"}'
+
+*/

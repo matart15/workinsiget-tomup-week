@@ -1,0 +1,10 @@
+---
+description: src/pages directory File Organization
+globs: src/pages/**
+alwaysApply: true
+---
+
+use Shadcn components for ui
+use src/components/SpecComponents for inputs
+use src/components/SpecComponents/SpecForm for form inputs
+

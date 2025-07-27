@@ -1,0 +1,136 @@
+scripts:
+  build: |
+    cp ./.env.production ./.env
+    pnpm vite build
+  clean: git clean -xdf .turbo node_modules
+  coverage: vitest run --coverage
+  start:
+    dev: |
+      cp ./.env.localhost ./.env
+      concurrently "pnpm vite" "nps start.dev-server"
+    prod: |
+      cp ./.env.production ./.env
+      concurrently "pnpm vite" "nps start.dev-server"
+    dev-server:
+      default: |
+        pnpx specdest_dev_server
+  lint:
+    default: TIMING=1 pnpm eslint "./src/**/*.{js,ts,tsx}"
+    fix: nps "lint --fix"
+  test: vitest
+  fmt:
+    default: pnpm prettier --list-different "**/*.{js,cjs,mjs,ts,tsx,md,json}"
+    fix: nps "fmt --write"
+  typecheck: pnpm tsc --noEmit
+  db:
+    start:
+      default: nps db.start.docker && nps db.start.fn
+      docker: pnpm supabase start
+      fn: pnpm supabase functions serve
+    stop:
+      default: pnpm supabase stop
+      no-backup: pnpm supabase stop --no-backup
+    snaplet:
+      generate:
+        default: |
+          pnpx tsx seed.ts > temp_seed.sql
+          sed '/Database seeded successfully!/d' temp_seed.sql > seed.sql
+          rm temp_seed.sql
+          echo "" >> seed.sql
+          cat seed_bucket.sql >> seed.sql
+        reset: |
+          rm -rf seed.sql
+          nps db.stop.no-backup
+          nps db.start.docker
+          nps db.migrate.local
+          nps db.snaplet.generate
+          nps db.reset.local
+    test: pnpm supabase db test
+    lintTmpDisabled: pnpm supabase db lint
+    generate:
+      default: |
+        pnpm config set script-shell "/bin/bash"
+        source ./supabase/.env
+        pnpm supabase gen types typescript --project-id $SUPABASE_PROJECT_REF > ./supabase/functions/_shared/database.ts
+        cp -f ./supabase/functions/_shared/database.ts ./src/__generated__/database.ts
+      local: |
+        pnpx supabase gen types typescript --local > supabase/functions/_shared/database.ts
+        cp -f supabase/functions/_shared/database.ts src/__generated__/database.ts
+      remote: |
+        pnpm config set script-shell "/bin/bash"
+        source supabase/.env.production
+        pnpm supabase gen types typescript --db-url $SUPABASE_DB_URL > supabase/functions/_shared/database.ts
+        cp -f supabase/functions/_shared/database.ts src/__generated__/database.ts
+    reset:
+      local: pnpm supabase db reset
+    rebuild:
+      local: |
+        rm -rf seed.sql
+        nps db.stop.no-backup
+        nps db.start.docker
+        nps db.migrate.local
+        nps db.snaplet.generate
+        nps db.reset.local
+    migrate:
+      local: pnpm supabase migration up --local
+      remote: |
+        pnpm config set script-shell "/bin/bash"
+        source ./supabase/.env.production
+        pnpm supabase migration up --db-url $SUPABASE_DB_URL
+    push:
+      remote: |
+        pnpm config set script-shell "/bin/bash"; source ./supabase/.env.production
+        pnpm supabase db push --db-url $SUPABASE_DB_URL
+    loginWithOldToken: pnpm supabase@1.112.0 login
+    login: pnpm supabase login --no-browser
+    pull:
+      local: pnpm supabase db pull --local --schema public,storage,graphql_public
+      remote: |
+        pnpm config set script-shell "/bin/bash"
+        source supabase/.env.production
+        pnpm supabase db pull --db-url $SUPABASE_DB_URL --schema public,storage,graphql_public
+    dump:
+      default: nps db.dump.schema && nps db.dump.data && nps db.dump.role
+      schema: |
+        pnpm config set script-shell "/bin/bash"
+        source supabase/.env.production
+        pnpm supabase db dump -f supabase/db/schema.sql --db-url $SUPABASE_DB_URL
+      data: |
+        pnpm config set script-shell "/bin/bash"
+        source supabase/.env.production
+        pnpm supabase db dump -f supabase/db/data.sql --db-url $SUPABASE_DB_URL --data-only
+      role: |
+        pnpm config set script-shell "/bin/bash"
+        source supabase/.env.production
+        pnpm supabase db dump -f supabase/db/role.sql --db-url $SUPABASE_DB_URL --role-only
+    zod_old: |
+      pnpx tsx supabase-to-zod/cli.ts --input ./supabase/functions/_shared/database.ts --output ./supabase/functions/_shared/schema.ts &&
+      cp -f ./supabase/functions/_shared/schema.ts ./src/__generated__/schema.ts &&
+      cp -f ./supabase/functions/_shared/validation.ts ./src/__generated__/validation.ts
+    # generate:
+    #   remote: |
+    #     pnpm config set script-shell "/bin/bash"
+    #     source .env
+    #     pnpm supabase gen types typescript --db-url $SUPABASE_DB_URL > src/db/types/src/database.ts
+    zod: |
+      deno run --allow-all generate-zod-schema.ts > ./src/__generated__/schema.ts &&
+      cp -f ./supabase/functions/_shared/validation.ts ./src/__generated__/validation.ts
+  fn:
+    deploy: |
+      pnpm config set script-shell "/bin/bash"
+      source supabase/.env.production
+      pnpm supabase functions deploy --project-ref $SUPABASE_PROJECT_REF
+    copySecrets:
+      prod: |
+        pnpm config set script-shell "/bin/bash"
+        source ./.env.production
+        pnpm supabase secrets set --env-file ./functions/.env.prod --project-ref $SUPABASE_PROJECT_REF`
+
+  deploy:
+    firebase:
+      production: |
+        nps build &&
+        firebase deploy -P default --only hosting
+      staging: |
+        nps build &&
+        firebase hosting:channel:deploy staging --expires 30d

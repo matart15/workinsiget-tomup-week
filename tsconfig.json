@@ -1,0 +1,16 @@
+{
+  "extends": "@matart15/tool_config_typescript/base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "strictNullChecks": true,
+    "noErrorTruncation": true
+  },
+  "include": ["."],
+  "exclude": ["node_modules", "src/components/ui", "supabase"]
+}

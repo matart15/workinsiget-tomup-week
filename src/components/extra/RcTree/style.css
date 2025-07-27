@@ -1,0 +1,14 @@
+.rc-tree-treenode {
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+.rc-tree-node-content-wrapper {
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+.rc-tree-icon__customize {
+  height: 40px !important;
+  width: 40px !important;
+}

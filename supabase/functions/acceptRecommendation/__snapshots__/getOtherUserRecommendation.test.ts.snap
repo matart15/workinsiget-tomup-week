@@ -1,0 +1,121 @@
+export const snapshot = {};
+
+snapshot[`getOtherUserRecommendation should return recommendation 1`] = `
+[
+  [
+    {
+      from: [
+        "u_recommendations",
+      ],
+    },
+    {
+      select: [
+        "*",
+      ],
+    },
+    {
+      eq: [
+        "user1_id",
+        "456",
+      ],
+    },
+    {
+      eq: [
+        "user2_id",
+        "789",
+      ],
+    },
+    {
+      eq: [
+        "status",
+        "ACCEPTED",
+      ],
+    },
+    {
+      limit: [
+        1,
+      ],
+    },
+  ],
+]
+`;
+
+snapshot[`getOtherUserRecommendation should throw an error if data length is more than 1 1`] = `
+[
+  [
+    {
+      from: [
+        "u_recommendations",
+      ],
+    },
+    {
+      select: [
+        "*",
+      ],
+    },
+    {
+      eq: [
+        "user1_id",
+        "456",
+      ],
+    },
+    {
+      eq: [
+        "user2_id",
+        "789",
+      ],
+    },
+    {
+      eq: [
+        "status",
+        "ACCEPTED",
+      ],
+    },
+    {
+      limit: [
+        1,
+      ],
+    },
+  ],
+]
+`;
+
+snapshot[`getOtherUserRecommendation should throw an error if there is an error 1`] = `
+[
+  [
+    {
+      from: [
+        "u_recommendations",
+      ],
+    },
+    {
+      select: [
+        "*",
+      ],
+    },
+    {
+      eq: [
+        "user1_id",
+        "456",
+      ],
+    },
+    {
+      eq: [
+        "user2_id",
+        "789",
+      ],
+    },
+    {
+      eq: [
+        "status",
+        "ACCEPTED",
+      ],
+    },
+    {
+      limit: [
+        1,
+      ],
+    },
+  ],
+]
+`;

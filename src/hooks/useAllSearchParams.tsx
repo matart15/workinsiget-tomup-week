@@ -1,0 +1,51 @@
+import { useSearchParams } from 'react-router-dom';
+
+const removeEmptyValues = (
+  object: Record<string, string | string[] | number | null | undefined>,
+) =>
+  Object.fromEntries(
+    Object.entries(object).filter(
+      ([_, value]) =>
+        !(
+          !value
+          || value === ''
+          || (Array.isArray(value) && value.length === 0)
+        ),
+    ),
+  );
+
+export const useAllSearchParams = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const allSearchParams: Record<string, string> = {};
+
+  const entries = searchParams.entries();
+  // Display the key/value pairs
+  for (const [key, value] of entries) {
+    allSearchParams[key] = value;
+  }
+  const changeSearchParam = (
+    object: Record<string, string | null | number>,
+    options?: {
+      overwrite: boolean;
+    },
+  ) => {
+    // remove empty values and empty arrays
+    const newObject = removeEmptyValues(object);
+    const mergeObject = options?.overwrite
+      ? newObject
+      : { ...allSearchParams, ...newObject };
+
+    const newUrlSearchParams = new URLSearchParams();
+    const entries2 = Object.entries(mergeObject);
+    for (const [key, value] of entries2) {
+      newUrlSearchParams.set(key, String(value));
+    }
+    setSearchParams(newUrlSearchParams);
+  };
+
+  return {
+    changeSearchParam,
+    params: allSearchParams,
+    setSearchParams,
+  };
+};

@@ -1,0 +1,68 @@
+I want to create mobile first web app
+I will use 
+
+react
+vite
+generouted
+typescript
+shadcn/ui
+react-query
+react-hook-form
+supabase
+
+
+
+My flow is 
+daily around 8:00 am app asks mom how is shee feeling
+mom will select one of few options ( raining, thunder, warm ... ). can also include text
+depending on answer app will ask if she is in one of common problems she is facing
+mom will select nearest situation to herself or input cutsom inputs
+app will continue conversation with mom and conclude somewhere.
+
+later app will let dad to know rough feeling of mom as emoji to father and ask his opinion.
+and continue conversation with dad and conclude somewhere.
+
+all conclusion will be used as later ai information.
+
+later somewhere my app will suggest action to father.
+for example: today is mom's day. but previously mom had this conversation maybe you should buy this.
+
+opposite but same flow is possible too. starting from dad
+
+app will learn from user interaction and keep data for later use. for example monthly summary or graph
+
+For MVP AI will use OPENAI api. We will prepare prompt, adds user input and send to API. Promt can be edited from ADMIN UI
+
+I will keep role in auth.users.app_metadata and sync it with public.profile.role via trigger
+to make my ai is learning from past data. Will send past 7 day data summary to OPENAI api
+
+
+understand and summerize this. I will ask you extra questions
+
+
+
+------------------------------------------------------------------------------------------------------------------------------
+
+
+Now I am planning to create database on supabase. 
+
+Give me main concepts and names of database tables i should create and relations. no need of fields for now. 
+
+keep in mind i have role in public.profile's role field
+
+since mom must have single dad we add relation directly to profile
+
+i preffer prefix for tables. example instead of problem_master use m_problem
+
+------------------------------------------------------------------------------------------------------------------------------
+
+
+Now give me sql to create all that for supabse.
+
+include triggers
+1. when user created sync auth.users.id to profile.id
+2. when user created sync auth.users. raw_app_meta_data.role to profile.role
+
+also include RLS
+
+Give me single sql

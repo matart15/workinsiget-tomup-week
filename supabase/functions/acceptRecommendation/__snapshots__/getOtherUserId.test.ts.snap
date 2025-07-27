@@ -1,0 +1,27 @@
+export const snapshot = {};
+
+snapshot[`getOtherUserId should return other user id 1`] = `
+[
+  [
+    {
+      from: [
+        "u_recommendations",
+      ],
+    },
+    {
+      select: [
+        "*",
+      ],
+    },
+    {
+      eq: [
+        "id",
+        123,
+      ],
+    },
+    {
+      single: [],
+    },
+  ],
+]
+`;

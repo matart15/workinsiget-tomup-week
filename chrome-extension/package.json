@@ -1,0 +1,30 @@
+{
+  "name": "workinsight-chrome-extension",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Chrome extension for WorkInsight data collection",
+  "author": "WorkInsight Team",
+  "license": "MIT",
+  "keywords": [
+    "chrome-extension",
+    "data-collection",
+    "productivity",
+    "analytics",
+    "supabase"
+  ],
+  "scripts": {
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp manifest.json dist/ && cp popup.html dist/ && cp popup.css dist/ && cp privacy.html dist/ && cp terms.html dist/ && cp env.json dist/ 2>/dev/null || true && cp -r icons dist/",
+    "watch": "tsc --watch",
+    "dev": "npm run build && npm run watch",
+    "clean": "rm -rf dist",
+    "setup": "node setup-env.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "typescript": "^5.8.3"
+  }
+}
