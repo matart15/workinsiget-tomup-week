@@ -1,10 +1,9 @@
 // Environment Configuration for Chrome Extension
-// This file handles environment variables for the Chrome extension
+// Clean, refactored version
 
 // Method 1: Read from a config file (recommended for development)
-const loadEnvFromFile = async (): Promise<Record<string, string>> => {
+const loadEnvFromFile = async () => {
   try {
-    // Try to load from a local env.json file (for development)
     const response = await fetch(chrome.runtime.getURL('env.json'));
     if (response.ok) {
       return await response.json();
@@ -16,7 +15,7 @@ const loadEnvFromFile = async (): Promise<Record<string, string>> => {
 };
 
 // Method 2: Read from Chrome storage (for production)
-const loadEnvFromStorage = async (): Promise<Record<string, string>> => {
+const loadEnvFromStorage = async () => {
   try {
     const result = await chrome.storage.local.get(['env_config']);
     return result.env_config || {};
@@ -27,14 +26,10 @@ const loadEnvFromStorage = async (): Promise<Record<string, string>> => {
 };
 
 // Method 3: Hardcoded defaults (fallback)
-const getDefaultEnv = (): Record<string, string> => ({
-  SUPABASE_URL: 'https://your-project.supabase.co',
-  SUPABASE_ANON_KEY: 'your-anon-key',
-  API_BASE_URL: 'https://your-api-gateway.amazonaws.com',
-});
+const getDefaultEnv = () => ({});
 
 // Main function to get environment variables
-export const getEnv = async (): Promise<Record<string, string>> => {
+const getEnv = async () => {
   // Try different sources in order of preference
   const sources = [
     loadEnvFromFile,
@@ -45,7 +40,7 @@ export const getEnv = async (): Promise<Record<string, string>> => {
   for (const source of sources) {
     try {
       const env = await source();
-      if (env.SUPABASE_URL && !env.SUPABASE_URL.includes('your-')) {
+      if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
         return env;
       }
     } catch (error) {
@@ -53,27 +48,22 @@ export const getEnv = async (): Promise<Record<string, string>> => {
     }
   }
 
-  return getDefaultEnv();
+  throw new Error('No valid environment configuration found. Please set up env.json or configure via storage.');
 };
 
 // Helper functions to get specific env vars
-export const getSupabaseUrl = async (): Promise<string> => {
+const getSupabaseUrl = async () => {
   const env = await getEnv();
   return env.SUPABASE_URL;
 };
 
-export const getSupabaseAnonKey = async (): Promise<string> => {
+const getSupabaseAnonKey = async () => {
   const env = await getEnv();
   return env.SUPABASE_ANON_KEY;
 };
 
-export const getApiBaseUrl = async (): Promise<string> => {
-  const env = await getEnv();
-  return env.API_BASE_URL;
-};
-
 // Function to set environment variables in Chrome storage
-export const setEnvInStorage = async (envConfig: Record<string, string>): Promise<void> => {
+const setEnvInStorage = async (envConfig) => {
   try {
     await chrome.storage.local.set({ env_config: envConfig });
     console.log('Environment config saved to storage');
@@ -83,17 +73,30 @@ export const setEnvInStorage = async (envConfig: Record<string, string>): Promis
 };
 
 // Function to validate environment configuration
-export const validateEnv = async (): Promise<boolean> => {
-  const env = await getEnv();
-  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'API_BASE_URL'];
+const validateEnv = async () => {
+  try {
+    const env = await getEnv();
+    const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
 
-  for (const key of required) {
-    const value = env[key];
-    if (!value || value.includes('your-') || value.includes('replace')) {
-      console.error(`❌ Environment error: ${key} is not properly set`);
-      return false;
+    for (const key of required) {
+      if (!env[key]) {
+        console.error(`❌ Environment error: ${key} is not set`);
+        return false;
+      }
     }
-  }
 
-  return true;
+    return true;
+  } catch (error) {
+    console.error('❌ Environment validation failed:', error.message);
+    return false;
+  }
+};
+
+// Make functions available globally for Chrome extension
+window.EnvConfig = {
+  getEnv,
+  getSupabaseUrl,
+  getSupabaseAnonKey,
+  setEnvInStorage,
+  validateEnv,
 };

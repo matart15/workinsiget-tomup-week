@@ -1,40 +1,116 @@
-import { createUserProfile, getSupabase, getUserProfile } from './supabase';
+// Chrome Extension Popup Controller
+// Clean, refactored version using official Supabase client
 
-type UserData = {
-  userId: string;
-  email: string;
-  name: string;
-  isAuthenticated: boolean;
-  lastSync: number;
+// Initialize Supabase client
+let supabase = null;
+
+const initializeSupabase = async () => {
+  if (supabase) {
+    return supabase;
+  }
+
+  const url = await window.EnvConfig.getSupabaseUrl();
+  const anonKey = await window.EnvConfig.getSupabaseAnonKey();
+
+  // Create Supabase client with Chrome extension storage
+  supabase = window.supabase.createClient(url, anonKey, {
+    auth: {
+      storage: {
+        getItem: (key) => {
+          return new Promise((resolve) => {
+            chrome.storage.local.get([key], (result) => {
+              resolve(result[key] || null);
+            });
+          });
+        },
+        setItem: (key, value) => {
+          return new Promise((resolve) => {
+            chrome.storage.local.set({ [key]: value }, resolve);
+          });
+        },
+        removeItem: (key) => {
+          return new Promise((resolve) => {
+            chrome.storage.local.remove([key], resolve);
+          });
+        },
+      },
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
+
+  return supabase;
 };
 
-type AuthResponse = {
-  success: boolean;
-  user?: UserData;
-  error?: string;
+const getSupabase = async () => {
+  return await initializeSupabase();
+};
+
+// Helper functions
+const getUserProfile = async (userId) => {
+  try {
+    const supabaseClient = await getSupabase();
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in getUserProfile:', error);
+    return null;
+  }
+};
+
+const createUserProfile = async (userId, email, name) => {
+  try {
+    const supabaseClient = await getSupabase();
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .insert([
+        {
+          user_id: userId,
+          email,
+          full_name: name || email.split('@')[0],
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating user profile:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createUserProfile:', error);
+    return null;
+  }
 };
 
 class PopupController {
-  private userData: UserData | null = null;
-  private isActive: boolean = false;
-
   constructor() {
+    this.userData = null;
+    this.isActive = false;
     this.initialize();
   }
 
-  private async initialize() {
-    // Load user data and active state
+  async initialize() {
     await this.loadUserData();
     await this.loadActiveState();
-
-    // Set up event listeners
     this.setupEventListeners();
-
-    // Update UI based on current state
     this.updateUI();
   }
 
-  private async loadUserData() {
+  async loadUserData() {
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_USER_DATA' });
       this.userData = response.userData;
@@ -43,7 +119,7 @@ class PopupController {
     }
   }
 
-  private async loadActiveState() {
+  async loadActiveState() {
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_ACTIVE_STATE' });
       this.isActive = response.isActive;
@@ -52,10 +128,13 @@ class PopupController {
     }
   }
 
-  private setupEventListeners() {
+  setupEventListeners() {
     // Auth form events
-    document.getElementById('loginFormElement')?.addEventListener('submit', this.handleLogin.bind(this));
-    document.getElementById('signupFormElement')?.addEventListener('submit', this.handleSignup.bind(this));
+    const loginForm = document.getElementById('loginFormElement');
+    const signupForm = document.getElementById('signupFormElement');
+
+    loginForm?.addEventListener('submit', this.handleLogin.bind(this));
+    signupForm?.addEventListener('submit', this.handleSignup.bind(this));
 
     // Form switching
     document.getElementById('showSignup')?.addEventListener('click', this.showSignupForm.bind(this));
@@ -71,19 +150,23 @@ class PopupController {
     document.getElementById('termsLink')?.addEventListener('click', this.openTermsConditions.bind(this));
   }
 
-  private async handleLogin(event: Event) {
+  async handleLogin(event) {
     event.preventDefault();
 
-    const form = event.target as HTMLFormElement;
-    const email = (form.querySelector('#email') as HTMLInputElement).value;
-    const password = (form.querySelector('#password') as HTMLInputElement).value;
+    const form = event.target;
+    const email = form.querySelector('#email').value;
+    const password = form.querySelector('#password').value;
 
     try {
       this.setLoading(true);
+      console.log('🚀 ~ handleLogin:');
       const response = await this.authenticateUser(email, password);
+      console.log('🚀 ~ response:', response);
 
       if (response.success && response.user) {
         this.userData = response.user;
+        console.log('🚀 ~ Login successful, userData:', this.userData);
+        console.log('🚀 ~ accessToken:', this.userData.accessToken);
         await chrome.runtime.sendMessage({
           type: 'SET_USER_DATA',
           data: this.userData,
@@ -94,20 +177,21 @@ class PopupController {
         this.showError(response.error || 'Login failed');
       }
     } catch (error) {
+      console.error('Login error:', error);
       this.showError('Login failed. Please try again.');
     } finally {
       this.setLoading(false);
     }
   }
 
-  private async handleSignup(event: Event) {
+  async handleSignup(event) {
     event.preventDefault();
 
-    const form = event.target as HTMLFormElement;
-    const name = (form.querySelector('#signupName') as HTMLInputElement).value;
-    const email = (form.querySelector('#signupEmail') as HTMLInputElement).value;
-    const password = (form.querySelector('#signupPassword') as HTMLInputElement).value;
-    const confirmPassword = (form.querySelector('#signupConfirmPassword') as HTMLInputElement).value;
+    const form = event.target;
+    const name = form.querySelector('#signupName').value;
+    const email = form.querySelector('#signupEmail').value;
+    const password = form.querySelector('#signupPassword').value;
+    const confirmPassword = form.querySelector('#signupConfirmPassword').value;
 
     if (password !== confirmPassword) {
       this.showError('Passwords do not match');
@@ -120,6 +204,8 @@ class PopupController {
 
       if (response.success && response.user) {
         this.userData = response.user;
+        console.log('🚀 ~ Registration successful, userData:', this.userData);
+        console.log('🚀 ~ accessToken:', this.userData.accessToken);
         await chrome.runtime.sendMessage({
           type: 'SET_USER_DATA',
           data: this.userData,
@@ -130,15 +216,15 @@ class PopupController {
         this.showError(response.error || 'Registration failed');
       }
     } catch (error) {
+      console.error('Registration error:', error);
       this.showError('Registration failed. Please try again.');
     } finally {
       this.setLoading(false);
     }
   }
 
-  private async handleLogout() {
+  async handleLogout() {
     try {
-      // Sign out from Supabase
       const supabaseClient = await getSupabase();
       await supabaseClient.auth.signOut();
 
@@ -156,8 +242,8 @@ class PopupController {
     }
   }
 
-  private async handleToggleChange(event: Event) {
-    const checkbox = event.target as HTMLInputElement;
+  async handleToggleChange(event) {
+    const checkbox = event.target;
     this.isActive = checkbox.checked;
 
     await chrome.runtime.sendMessage({
@@ -168,7 +254,7 @@ class PopupController {
     this.updateStatusIndicator();
   }
 
-  private async handleSync() {
+  async handleSync() {
     try {
       this.setSyncLoading(true);
       await chrome.runtime.sendMessage({ type: 'SYNC_DATA' });
@@ -181,32 +267,32 @@ class PopupController {
     }
   }
 
-  private showLoginForm() {
-    document.getElementById('loginForm')!.style.display = 'block';
-    document.getElementById('signupForm')!.style.display = 'none';
+  showLoginForm() {
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('signupForm').style.display = 'none';
   }
 
-  private showSignupForm() {
-    document.getElementById('loginForm')!.style.display = 'none';
-    document.getElementById('signupForm')!.style.display = 'block';
+  showSignupForm() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('signupForm').style.display = 'block';
   }
 
-  private openPrivacyPolicy() {
+  openPrivacyPolicy() {
     chrome.tabs.create({ url: chrome.runtime.getURL('privacy.html') });
   }
 
-  private openTermsConditions() {
+  openTermsConditions() {
     chrome.tabs.create({ url: chrome.runtime.getURL('terms.html') });
   }
 
-  private async authenticateUser(email: string, password: string): Promise<AuthResponse> {
+  async authenticateUser(email, password) {
     try {
-      // Sign in with Supabase
       const supabaseClient = await getSupabase();
       const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
         password,
       });
+      console.log(`🚀 ~ { data, error }:`, { data, error });
 
       if (error) {
         return {
@@ -228,10 +314,11 @@ class PopupController {
       return {
         success: true,
         user: {
-          userId: data.user.id,
+          userId: profile?.id || data.user.id, // Use profile.id as userId for activity logs
           email: data.user.email || email,
-          name: profile?.name || data.user.email?.split('@')[0] || 'User',
+          name: profile?.full_name || data.user.email?.split('@')[0] || 'User',
           isAuthenticated: true,
+          accessToken: data.session?.access_token, // Add access token from session
           lastSync: Date.now(),
         },
       };
@@ -244,9 +331,8 @@ class PopupController {
     }
   }
 
-  private async registerUser(name: string, email: string, password: string): Promise<AuthResponse> {
+  async registerUser(name, email, password) {
     try {
-      // Sign up with Supabase
       const supabaseClient = await getSupabase();
       const { data, error } = await supabaseClient.auth.signUp({
         email,
@@ -273,10 +359,11 @@ class PopupController {
       return {
         success: true,
         user: {
-          userId: data.user.id,
+          userId: profile?.id || data.user.id, // Use profile.id as userId for activity logs
           email: data.user.email || email,
-          name: profile?.name || name || email.split('@')[0],
+          name: profile?.full_name || name || email.split('@')[0],
           isAuthenticated: true,
+          accessToken: data.session?.access_token, // Add access token from session
           lastSync: Date.now(),
         },
       };
@@ -289,20 +376,20 @@ class PopupController {
     }
   }
 
-  private updateUI() {
-    const authSection = document.getElementById('authSection')!;
-    const mainSection = document.getElementById('mainSection')!;
-    const statusIndicator = document.getElementById('statusIndicator')!;
+  updateUI() {
+    const authSection = document.getElementById('authSection');
+    const mainSection = document.getElementById('mainSection');
+    const statusIndicator = document.getElementById('statusIndicator');
 
     if (this.userData?.isAuthenticated) {
       authSection.style.display = 'none';
       mainSection.style.display = 'block';
 
       // Update user info
-      document.getElementById('userEmail')!.textContent = this.userData.email;
+      document.getElementById('userEmail').textContent = this.userData.email;
 
       // Update toggle state
-      const toggle = document.getElementById('activeToggle') as HTMLInputElement;
+      const toggle = document.getElementById('activeToggle');
       toggle.checked = this.isActive;
 
       this.updateStatusIndicator();
@@ -315,8 +402,8 @@ class PopupController {
     }
   }
 
-  private updateStatusIndicator() {
-    const statusIndicator = document.getElementById('statusIndicator')!;
+  updateStatusIndicator() {
+    const statusIndicator = document.getElementById('statusIndicator');
     if (this.isActive && this.userData?.isAuthenticated) {
       statusIndicator.classList.remove('inactive');
     } else {
@@ -324,8 +411,8 @@ class PopupController {
     }
   }
 
-  private updateLastSync() {
-    const lastSyncElement = document.getElementById('lastSync')!;
+  updateLastSync() {
+    const lastSyncElement = document.getElementById('lastSync');
     if (this.userData?.lastSync) {
       const lastSync = new Date(this.userData.lastSync);
       lastSyncElement.textContent = `Last sync: ${lastSync.toLocaleDateString()}`;
@@ -334,27 +421,27 @@ class PopupController {
     }
   }
 
-  private updateStats() {
+  updateStats() {
     // This would typically fetch stats from your backend
     // For now, showing placeholder data
-    document.getElementById('sitesVisited')!.textContent = '0';
-    document.getElementById('timeSpent')!.textContent = '0h';
+    document.getElementById('sitesVisited').textContent = '0';
+    document.getElementById('timeSpent').textContent = '0h';
   }
 
-  private setLoading(loading: boolean) {
+  setLoading(loading) {
     const buttons = document.querySelectorAll('.btn-primary');
     buttons.forEach((button) => {
-      (button as HTMLButtonElement).disabled = loading;
+      button.disabled = loading;
     });
   }
 
-  private setSyncLoading(loading: boolean) {
-    const syncBtn = document.getElementById('syncBtn') as HTMLButtonElement;
+  setSyncLoading(loading) {
+    const syncBtn = document.getElementById('syncBtn');
     syncBtn.disabled = loading;
     syncBtn.textContent = loading ? 'Syncing...' : 'Sync Data';
   }
 
-  private showError(message: string) {
+  showError(message) {
     // Remove existing error messages
     document.querySelectorAll('.error').forEach(el => el.remove());
 
@@ -369,7 +456,7 @@ class PopupController {
     }
   }
 
-  private showSuccess(message: string) {
+  showSuccess(message) {
     // Remove existing success messages
     document.querySelectorAll('.success').forEach(el => el.remove());
 

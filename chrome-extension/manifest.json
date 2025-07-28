@@ -7,11 +7,22 @@
     "storage",
     "activeTab",
     "tabs",
-    "scripting"
+    "scripting",
+    "windows",
+    "webNavigation",
+    "sessions",
+    "idle",
+    "bookmarks",
+    "history",
+    "webRequest",
+    "notifications",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "https://*/*",
-    "http://*/*"
+    "http://*/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,7 +33,7 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "content-script.js"
       ],
       "run_at": "document_start"
     }
@@ -46,10 +57,10 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "auth.html",
         "privacy.html",
         "terms.html",
-        "env.json"
+        "env.json",
+        "supabase.js"
       ],
       "matches": [
         "<all_urls>"

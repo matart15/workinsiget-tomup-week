@@ -1,191 +1,79 @@
--- ===============================
--- 1. PUBLIC.PROFILE
--- ===============================
-create table public.profile (
-  id uuid primary key references auth.users(id) on delete cascade,
-  role text not null,
-  partner_id uuid references public.profile(id) on delete set null,
-  created_at timestamp with time zone default now()
+-- Create profiles table
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "email" "text",
+    "full_name" "text",
+    "avatar_url" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    PRIMARY KEY ("id")
 );
 
--- ===============================
--- 2. MASTER: m_problem
--- ===============================
-create table public.m_problem (
-  id uuid primary key default gen_random_uuid(),
-  label text not null,
-  description text,
-  created_at timestamp with time zone default now()
+-- Add RLS policies for profiles
+ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+
+-- Policy to allow users to manage their own profile
+CREATE POLICY "Users can manage their own profile" ON "public"."profiles"
+    FOR ALL USING ("auth"."uid"() = "id");
+
+-- Add index for profiles
+CREATE INDEX "idx_profiles_id" ON "public"."profiles" ("id");
+
+-- Create function to handle new user creation
+CREATE OR REPLACE FUNCTION "public"."handle_new_user"()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO "public"."profiles" ("id", "email", "full_name")
+    VALUES (
+        NEW."id",
+        NEW."email",
+        COALESCE(NEW."raw_user_meta_data"->>'full_name', NEW."email")
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger to automatically create profile on user creation
+CREATE TRIGGER "on_auth_user_created"
+    AFTER INSERT ON "auth"."users"
+    FOR EACH ROW EXECUTE FUNCTION "public"."handle_new_user"();
+
+-- Add foreign key constraint to cascade delete profiles when auth.users is deleted
+-- This must be after the trigger to avoid race conditions
+ALTER TABLE "public"."profiles" ADD CONSTRAINT "profiles_id_fkey" 
+    FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+-- Drop existing user_activity_logs table and recreate with user_id
+DROP TABLE IF EXISTS "public"."user_activity_logs";
+
+-- Recreate user activity logs table with user_id
+CREATE TABLE IF NOT EXISTS "public"."user_activity_logs" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "url" "text" NOT NULL,
+    "title" "text",
+    "duration" "int8" NOT NULL,
+    "timestamp" "int8" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
--- ===============================
--- 3. CHECK-IN FLOW
--- ===============================
+-- Add RLS policies for user_activity_logs
+ALTER TABLE "public"."user_activity_logs" ENABLE ROW LEVEL SECURITY;
 
--- Daily Check-in
-create table public.c_daily_checkin (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profile(id) on delete cascade,
-  checkin_date date not null default current_date,
-  mood text,
-  note text,
-  created_at timestamp with time zone default now()
-);
+-- Policy to allow users to insert their own activity logs
+CREATE POLICY "Users can insert their own activity logs" ON "public"."user_activity_logs"
+    FOR INSERT WITH CHECK ("auth"."uid"() = "user_id");
 
--- Problem Check (linked to m_problem)
-create table public.c_problem_check (
-  id uuid primary key default gen_random_uuid(),
-  checkin_id uuid references public.c_daily_checkin(id) on delete cascade,
-  problem_id uuid references public.m_problem(id) on delete set null,
-  custom_text text,
-  created_at timestamp with time zone default now()
-);
+-- Policy to allow users to view their own activity logs
+CREATE POLICY "Users can view their own activity logs" ON "public"."user_activity_logs"
+    FOR SELECT USING ("auth"."uid"() = "user_id");
 
--- ===============================
--- CONVERSATION FLOW
--- ===============================
+-- Add indexes for better performance
+CREATE INDEX "idx_user_activity_logs_user_id" ON "public"."user_activity_logs" ("user_id");
+CREATE INDEX "idx_user_activity_logs_timestamp" ON "public"."user_activity_logs" ("timestamp");
+CREATE INDEX "idx_user_activity_logs_created_at" ON "public"."user_activity_logs" ("created_at");
 
--- Conversation
-create table public.c_conversation (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profile(id) on delete cascade,
-  type text, -- e.g., checkin, followup
-  started_at timestamp with time zone default now()
-);
-
--- Message (from mom, dad, or system)
-create table public.c_message (
-  id uuid primary key default gen_random_uuid(),
-  conversation_id uuid references public.c_conversation(id) on delete cascade,
-  sender_id uuid references public.profile(id) on delete set null,
-  sender_type text not null, -- e.g., mom, dad, system
-  message text,
-  is_ai_generated boolean default false,
-  sent_at timestamp with time zone default now()
-);
-
--- Suggestion
-create table public.c_suggestion (
-  id uuid primary key default gen_random_uuid(),
-  to_user_id uuid references public.profile(id) on delete cascade,
-  from_conversation_id uuid references public.c_conversation(id) on delete set null,
-  suggestion text,
-  created_at timestamp with time zone default now()
-);
-
--- Summary
-create table public.c_summary (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profile(id) on delete cascade,
-  type text not null, -- weekly, monthly, etc.
-  summary text,
-  created_at timestamp with time zone default now()
-);
-
--- ===============================
--- ADMIN: a_prompt
--- ===============================
-create table public.a_prompt (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  content text not null,
-  description text,
-  created_at timestamp with time zone default now()
-);
-
--- ===============================
--- TRIGGERS TO SYNC AUTH.USERS → PROFILE
--- ===============================
-
--- Trigger function to insert into profile
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profile (id, role)
-  values (new.id, coalesce(new.raw_app_meta_data->>'role', 'user'));
-  return new;
-end;
-$$ language plpgsql security definer;
-
--- Attach trigger to auth.users
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute procedure public.handle_new_user();
-
--- ===============================
--- RLS ENABLE & POLICIES
--- ===============================
-
--- Enable RLS on all tables
-alter table public.profile enable row level security;
-alter table public.m_problem enable row level security;
-alter table public.c_daily_checkin enable row level security;
-alter table public.c_problem_check enable row level security;
-alter table public.c_conversation enable row level security;
-alter table public.c_message enable row level security;
-alter table public.c_suggestion enable row level security;
-alter table public.c_summary enable row level security;
-alter table public.a_prompt enable row level security;
-
--- Basic user-level access policies
-
--- profile: users can select/update their own profile
-create policy "Users can manage own profile"
-on public.profile
-for all
-using (auth.uid() = id);
-
--- check-in: only owner can access
-create policy "User can access their check-ins"
-on public.c_daily_checkin
-for all
-using (auth.uid() = user_id);
-
--- problem_check: based on check-in ownership
-create policy "User can access own problem checks"
-on public.c_problem_check
-for all
-using (
-  checkin_id in (
-    select id from public.c_daily_checkin where user_id = auth.uid()
-  )
-);
-
--- conversation
-create policy "User can access own conversations"
-on public.c_conversation
-for all
-using (auth.uid() = user_id);
-
--- message: based on conversation ownership
-create policy "User can access messages in own conversations"
-on public.c_message
-for all
-using (
-  conversation_id in (
-    select id from public.c_conversation where user_id = auth.uid()
-  )
-);
-
--- suggestion: if it's sent to the user
-create policy "User can access their suggestions"
-on public.c_suggestion
-for all
-using (auth.uid() = to_user_id);
-
--- summary
-create policy "User can access their summaries"
-on public.c_summary
-for all
-using (auth.uid() = user_id);
-
--- prompts: only admin can access
-create policy "Only admin can read/write prompts"
-on public.a_prompt
-for all
-using (
-  exists (
-    select 1 from public.profile
-    where id = auth.uid() and role = 'admin'
-  )
-);
+-- Add foreign key constraint
+ALTER TABLE "public"."user_activity_logs" ADD CONSTRAINT "user_activity_logs_user_id_fkey" 
+    FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE; 

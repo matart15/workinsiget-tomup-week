@@ -132,8 +132,8 @@ export const validationSchema = (z: typeof Zod) =>
 type BigFunctionSchema = ReturnType<typeof bigFunctionSchema>;
 export type AuthFunctionSchema = ReturnType<typeof authFunctionSchema>;
 export type ValidationSchema = ReturnType<typeof validationSchema>;
-export type FunctionPaths<T extends keyof ValidationSchema> =
-  keyof ValidationSchema[T];
+export type FunctionPaths<T extends keyof ValidationSchema>
+  = keyof ValidationSchema[T];
 // Utility type to get the outputSchema for a specific group and path
 export type OutputSchema<
   T extends keyof ValidationSchema,

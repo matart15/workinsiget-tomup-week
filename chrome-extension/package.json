@@ -13,18 +13,16 @@
     "supabase"
   ],
   "scripts": {
-    "build": "tsc && npm run copy-assets",
-    "copy-assets": "cp manifest.json dist/ && cp popup.html dist/ && cp popup.css dist/ && cp privacy.html dist/ && cp terms.html dist/ && cp env.json dist/ 2>/dev/null || true && cp -r icons dist/",
-    "watch": "tsc --watch",
+    "build": "mkdir -p dist && npm run copy-assets",
+    "copy-assets": "cp manifest.json dist/ && cp popup.html dist/ && cp popup.css dist/ && cp privacy.html dist/ && cp terms.html dist/ && cp env.json dist/ 2>/dev/null || true && cp -r icons dist/ && cp *.js dist/",
+    "watch": "npm run build",
     "dev": "npm run build && npm run watch",
-    "clean": "rm -rf dist",
-    "setup": "node setup-env.js"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.52.1"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.260",
-    "typescript": "^5.8.3"
+    "chokidar": "^3.6.0"
   }
 }

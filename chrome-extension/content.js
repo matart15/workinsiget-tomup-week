@@ -1,13 +1,16 @@
 // Content script for data collection
-class ContentScript {
-  private startTime: number = Date.now();
-  private isActive: boolean = false;
+// Clean, refactored version
 
+class ContentScript {
   constructor() {
+    this.startTime = Date.now();
+    this.isActive = false;
+    this.lastMouseMove = 0;
+    this.lastScroll = 0;
     this.initialize();
   }
 
-  private async initialize() {
+  async initialize() {
     // Check if extension is active
     const response = await chrome.runtime.sendMessage({ type: 'GET_ACTIVE_STATE' });
     this.isActive = response.isActive;
@@ -20,7 +23,7 @@ class ContentScript {
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
   }
 
-  private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
+  handleMessage(message, sender, sendResponse) {
     switch (message.type) {
       case 'SET_ACTIVE_STATE':
         this.isActive = message.isActive;
@@ -37,7 +40,7 @@ class ContentScript {
     }
   }
 
-  private startTracking() {
+  startTracking() {
     this.startTime = Date.now();
 
     // Track page visibility changes
@@ -53,35 +56,23 @@ class ContentScript {
     document.addEventListener('scroll', this.handleScroll.bind(this));
   }
 
-  private stopTracking() {
+  stopTracking() {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
     document.removeEventListener('mousemove', this.handleMouseMove.bind(this));
     document.removeEventListener('click', this.handleClick.bind(this));
     document.removeEventListener('scroll', this.handleScroll.bind(this));
   }
 
-  private handleVisibilityChange() {
+  handleVisibilityChange() {
     if (!this.isActive) {
-      return;
+
     }
 
-    const data = {
-      type: 'visibility_change',
-      url: window.location.href,
-      title: document.title,
-      timestamp: Date.now(),
-      isVisible: !document.hidden,
-      duration: Date.now() - this.startTime,
-    };
-
-    // Send data to background script
-    chrome.runtime.sendMessage({
-      type: 'RECORD_DATA',
-      data,
-    });
+    // Note: Data collection is handled by background.js tab tracking
+    // This function is kept for potential future use
   }
 
-  private handleMouseMove(event: MouseEvent) {
+  handleMouseMove(event) {
     if (!this.isActive) {
       return;
     }
@@ -92,41 +83,20 @@ class ContentScript {
     }
     this.lastMouseMove = Date.now();
 
-    const data = {
-      type: 'mouse_move',
-      url: window.location.href,
-      timestamp: Date.now(),
-      x: event.clientX,
-      y: event.clientY,
-    };
-
-    chrome.runtime.sendMessage({
-      type: 'RECORD_DATA',
-      data,
-    });
+    // Note: Mouse tracking is disabled for privacy
+    // This function is kept for potential future use
   }
 
-  private handleClick(event: MouseEvent) {
+  handleClick(event) {
     if (!this.isActive) {
-      return;
+
     }
 
-    const data = {
-      type: 'click',
-      url: window.location.href,
-      timestamp: Date.now(),
-      x: event.clientX,
-      y: event.clientY,
-      target: (event.target as HTMLElement)?.tagName || 'unknown',
-    };
-
-    chrome.runtime.sendMessage({
-      type: 'RECORD_DATA',
-      data,
-    });
+    // Note: Click tracking is disabled for privacy
+    // This function is kept for potential future use
   }
 
-  private handleScroll(event: Event) {
+  handleScroll(event) {
     if (!this.isActive) {
       return;
     }
@@ -137,22 +107,9 @@ class ContentScript {
     }
     this.lastScroll = Date.now();
 
-    const data = {
-      type: 'scroll',
-      url: window.location.href,
-      timestamp: Date.now(),
-      scrollY: window.scrollY,
-      scrollX: window.scrollX,
-    };
-
-    chrome.runtime.sendMessage({
-      type: 'RECORD_DATA',
-      data,
-    });
+    // Note: Scroll tracking is disabled for privacy
+    // This function is kept for potential future use
   }
-
-  private lastMouseMove: number = 0;
-  private lastScroll: number = 0;
 }
 
 // Initialize content script
